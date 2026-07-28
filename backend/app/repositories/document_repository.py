@@ -1,8 +1,9 @@
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document
 from app.schemas.document import DocumentCreate
+from sqlalchemy import select, or_
 
 
 class DocumentRepository:
@@ -20,7 +21,9 @@ class DocumentRepository:
         )
 
         db.add(db_document)
+
         await db.commit()
+
         await db.refresh(db_document)
 
         return db_document
@@ -35,21 +38,71 @@ class DocumentRepository:
         return result.scalars().all()
 
     @staticmethod
-    async def search(
+    async def get_by_id(
         db: AsyncSession,
-        query: str,
+        document_id: int,
     ):
 
-        statement = (
-            select(Document)
-            .where(
-                or_(
-                    Document.title.ilike(f"%{query}%"),
-                    Document.content.ilike(f"%{query}%"),
-                )
+        result = await db.execute(
+            select(Document).where(
+                Document.id == document_id
             )
         )
 
-        result = await db.execute(statement)
+        return result.scalar_one_or_none()
 
-        return result.scalars().all()
+    @staticmethod
+    async def delete(
+        db: AsyncSession,
+        document: Document,
+    ):
+
+        await db.delete(document)
+
+        await db.commit()
+    
+@staticmethod
+async def search(
+    db,
+    query: str,
+    page: int = 1,
+    size: int = 10,
+):
+    result = await db.execute(
+        select(Document).where(
+            or_(
+                Document.title.ilike(f"%{query}%"),
+                Document.content.ilike(f"%{query}%"),
+            )
+        )
+    )
+
+    documents = result.scalars().all()
+
+    results = []
+
+    for doc in documents:
+        title_matches = doc.title.lower().count(query.lower())
+        content_matches = doc.content.lower().count(query.lower())
+
+        score = title_matches * 3 + content_matches
+
+        results.append(
+            {
+                "id": doc.id,
+                "title": doc.title,
+                "url": doc.url,
+                "score": score,
+                "snippet": doc.content[:200],
+            }
+        )
+
+    results.sort(
+        key=lambda x: x["score"],
+        reverse=True,
+    )
+
+    start = (page - 1) * size
+    end = start + size
+
+    return results[start:end]
