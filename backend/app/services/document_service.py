@@ -3,7 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.document_repository import DocumentRepository
 from app.schemas.document import DocumentCreate
+from app.services.search_service import SearchService
 
+search_service = SearchService()
 
 class DocumentService:
 
@@ -12,7 +14,18 @@ class DocumentService:
         db: AsyncSession,
         document: DocumentCreate,
     ):
-        return await DocumentRepository.create(db, document)
+        document = await DocumentRepository.create(
+            db,
+            document,
+        )
+
+        # Index the newly created document
+        search_service.index.add_document(
+            document.id,
+            document.content,
+        )
+
+        return document
 
     @staticmethod
     async def get_documents(
@@ -71,9 +84,28 @@ class DocumentService:
         page: int = 1,
         size: int = 10,
     ):
-        return await DocumentRepository.search(
+        # Build the index (temporary)
+        await search_service.build_index(db)
+
+        documents = await search_service.search(
             db,
             query,
-            page,
-            size,
         )
+
+        results = []
+
+        for doc in documents:
+            results.append(
+                {
+                    "id": doc.id,
+                    "title": doc.title,
+                    "url": doc.url,
+                    "score": 1.0,
+                    "snippet": doc.content[:200],
+                }
+            )
+
+        start = (page - 1) * size
+        end = start + size
+
+        return results[start:end]
