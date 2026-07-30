@@ -73,7 +73,9 @@ class DocumentService:
             db,
             document,
         )
-
+        search_service.index.remove_document(
+            document.id
+        )
         return {
             "message": "Document deleted successfully"
         }
