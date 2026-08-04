@@ -5,7 +5,7 @@ from app.search.bm25 import BM25
 from app.search.inverted_index import InvertedIndex
 from app.search.preprocess import preprocess
 from app.search.phrase_search import PhraseSearch
-
+from app.search.boolean_search import BooleanSearch
 
 class SearchService:
 
@@ -37,23 +37,40 @@ class SearchService:
         query: str,
     ):
 
-        # Build index if needed
         if not self.index_built:
             await self.build_index(db)
-
-        # Get all documents
-        documents = await DocumentRepository.get_all_documents(db)
 
         # -----------------------------
         # Phrase Search
         # -----------------------------
         if query.startswith('"') and query.endswith('"'):
 
-            phrase = query[1:-1]
+            documents = await DocumentRepository.get_all_documents(db)
 
             return PhraseSearch.search(
                 documents,
-                phrase,
+                query[1:-1],
+            )
+
+        # -----------------------------
+        # Boolean Search
+        # -----------------------------
+        if (
+            " AND " in query
+            or " OR " in query
+            or " NOT " in query
+        ):
+
+            document_ids = list(
+                BooleanSearch.search(
+                    self.index,
+                    query,
+                )
+            )
+
+            return await DocumentRepository.get_documents_by_ids(
+                db,
+                document_ids,
             )
 
         # -----------------------------
