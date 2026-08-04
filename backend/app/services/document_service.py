@@ -7,6 +7,7 @@ from app.services.search_service import SearchService
 
 search_service = SearchService()
 
+
 class DocumentService:
 
     @staticmethod
@@ -14,18 +15,10 @@ class DocumentService:
         db: AsyncSession,
         document: DocumentCreate,
     ):
-        document = await DocumentRepository.create(
+        return await DocumentRepository.create(
             db,
             document,
         )
-
-        # Index the newly created document
-        search_service.index.add_document(
-            document.id,
-            document.content,
-        )
-
-        return document
 
     @staticmethod
     async def get_documents(
@@ -38,7 +31,6 @@ class DocumentService:
         db: AsyncSession,
         document_id: int,
     ):
-
         document = await DocumentRepository.get_by_id(
             db,
             document_id,
@@ -57,7 +49,6 @@ class DocumentService:
         db: AsyncSession,
         document_id: int,
     ):
-
         document = await DocumentRepository.get_by_id(
             db,
             document_id,
@@ -73,12 +64,11 @@ class DocumentService:
             db,
             document,
         )
-        search_service.index.remove_document(
-            document.id
-        )
+
         return {
             "message": "Document deleted successfully"
         }
+
     @staticmethod
     async def search_documents(
         db: AsyncSession,
@@ -86,7 +76,7 @@ class DocumentService:
         page: int = 1,
         size: int = 10,
     ):
-        # Build the index (temporary)
+        # Build the index if needed
         await search_service.build_index(db)
 
         documents = await search_service.search(

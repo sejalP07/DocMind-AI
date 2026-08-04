@@ -36,3 +36,41 @@ class TFIDF:
         idf,
     ):
         return tf * idf
+
+    @staticmethod
+    def rank_documents(
+        query_tokens,
+        index,
+        total_documents,
+        document_frequency,
+    ):
+        """
+        Calculate TF-IDF scores for matching documents.
+        """
+
+        scores = {}
+
+        for term in query_tokens:
+
+            if term not in index:
+                continue
+
+            idf = TFIDF.inverse_document_frequency(
+                total_documents,
+                document_frequency[term],
+            )
+
+            for document_id, frequency in index[term].items():
+
+                tf = frequency
+
+                scores[document_id] = (
+                    scores.get(document_id, 0)
+                    + TFIDF.score(tf, idf)
+                )
+
+        return sorted(
+            scores.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )

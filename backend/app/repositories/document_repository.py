@@ -22,38 +22,73 @@ class DocumentRepository:
         db.add(db_document)
 
         await db.commit()
-
         await db.refresh(db_document)
 
         return db_document
 
     @staticmethod
-    async def get_all(db: AsyncSession):
-        result = await db.execute(select(Document))
+    async def get_all(
+        db: AsyncSession,
+    ):
+        result = await db.execute(
+            select(Document)
+        )
+
         return result.scalars().all()
 
     @staticmethod
-    async def get_all_documents(db: AsyncSession):
-        # kept for backward compatibility
+    async def get_all_documents(
+        db: AsyncSession,
+    ):
         return await DocumentRepository.get_all(db)
 
     @staticmethod
     async def get_documents_by_ids(
         db: AsyncSession,
-        ids: set[int],
+        ids: list[int],
     ):
+        """
+        Returns documents in the same order as the given ids.
+        """
+
         if not ids:
             return []
 
-        result = await db.execute(select(Document).where(Document.id.in_(ids)))
-        return result.scalars().all()
+        result = await db.execute(
+            select(Document).where(
+                Document.id.in_(ids)
+            )
+        )
+
+        documents = result.scalars().all()
+
+        document_map = {
+            document.id: document
+            for document in documents
+        }
+
+        ordered_documents = []
+
+        for document_id in ids:
+            if document_id in document_map:
+                ordered_documents.append(
+                    document_map[document_id]
+                )
+
+        return ordered_documents
 
     @staticmethod
     async def get_by_id(
         db: AsyncSession,
         document_id: int,
     ):
-        result = await db.execute(select(Document).where(Document.id == document_id))
+
+        result = await db.execute(
+            select(Document).where(
+                Document.id == document_id
+            )
+        )
+
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -61,6 +96,7 @@ class DocumentRepository:
         db: AsyncSession,
         document: Document,
     ):
+
         await db.delete(document)
         await db.commit()
 
@@ -71,6 +107,7 @@ class DocumentRepository:
         page: int = 1,
         size: int = 10,
     ):
+
         result = await db.execute(
             select(Document).where(
                 or_(
@@ -85,8 +122,14 @@ class DocumentRepository:
         results = []
 
         for doc in documents:
-            title_matches = doc.title.lower().count(query.lower())
-            content_matches = doc.content.lower().count(query.lower())
+
+            title_matches = doc.title.lower().count(
+                query.lower()
+            )
+
+            content_matches = doc.content.lower().count(
+                query.lower()
+            )
 
             score = title_matches * 3 + content_matches
 
@@ -100,7 +143,10 @@ class DocumentRepository:
                 }
             )
 
-        results.sort(key=lambda x: x["score"], reverse=True)
+        results.sort(
+            key=lambda x: x["score"],
+            reverse=True,
+        )
 
         start = (page - 1) * size
         end = start + size
