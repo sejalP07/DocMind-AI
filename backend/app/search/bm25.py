@@ -7,15 +7,11 @@ class BM25:
     b = 0.75
 
     @staticmethod
-    def score(
-        term_frequency: int,
-        document_frequency: int,
+    def idf(
         total_documents: int,
-        document_length: int,
-        average_document_length: float,
+        document_frequency: int,
     ):
-
-        idf = math.log(
+        return math.log(
             (
                 total_documents
                 - document_frequency
@@ -29,7 +25,24 @@ class BM25:
             + 1
         )
 
-        numerator = term_frequency * (BM25.k1 + 1)
+    @staticmethod
+    def score(
+        term_frequency: int,
+        document_frequency: int,
+        total_documents: int,
+        document_length: int,
+        average_document_length: float,
+    ):
+
+        idf = BM25.idf(
+            total_documents,
+            document_frequency,
+        )
+
+        numerator = (
+            term_frequency
+            * (BM25.k1 + 1)
+        )
 
         denominator = (
             term_frequency
@@ -38,10 +51,8 @@ class BM25:
                 1
                 - BM25.b
                 + BM25.b
-                * (
-                    document_length
-                    / average_document_length
-                )
+                * document_length
+                / average_document_length
             )
         )
 

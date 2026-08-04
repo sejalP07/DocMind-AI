@@ -1,59 +1,81 @@
-from collections import Counter, defaultdict
-from typing import Dict, Set
+from collections import defaultdict
+from typing import Dict
 
 from app.search.preprocess import preprocess
 
 
 class InvertedIndex:
     """
-    Simple in-memory inverted index.
+    In-memory inverted index.
 
-    word -> {document ids}
+    Structure:
+        word -> {document_id: term_frequency}
     """
 
     def __init__(self):
-        # term -> {document_id: term_frequency}
+
+        # token -> {doc_id: frequency}
         self.index: Dict[str, Dict[int, int]] = defaultdict(dict)
 
-        # Total indexed documents
-        self.total_documents = 0
-
-        # document_id -> total number of terms
-        self.document_lengths: Dict[int, int] = {}
-
-        # term -> number of documents containing the term
+        # token -> number of documents containing token
         self.document_frequency: Dict[str, int] = defaultdict(int)
 
-    def add_document(self, document_id: int, text: str):
+        # doc_id -> document length
+        self.document_lengths: Dict[int, int] = {}
+
+        # total indexed documents
+        self.total_documents = 0
+
+    def add_document(
+        self,
+        document_id: int,
+        text: str,
+    ):
+
         tokens = preprocess(text)
 
-        if not tokens:
-            return
-
-        self.total_documents += 1
         self.document_lengths[document_id] = len(tokens)
 
-        term_counts = Counter(tokens)
+        self.total_documents += 1
 
-        for term, frequency in term_counts.items():
-            self.index[term][document_id] = frequency
-            self.document_frequency[term] += 1
+        frequencies = defaultdict(int)
 
-    def remove_document(self, document_id: int):
+        for token in tokens:
+            frequencies[token] += 1
+
+        for token, frequency in frequencies.items():
+
+            self.index[token][document_id] = frequency
+
+            self.document_frequency[token] += 1
+
+    def remove_document(
+        self,
+        document_id: int,
+    ):
+
+        for token in list(self.index.keys()):
+
+            if document_id in self.index[token]:
+
+                del self.index[token][document_id]
+
+                self.document_frequency[token] -= 1
+
+                if self.document_frequency[token] == 0:
+                    del self.document_frequency[token]
+                    del self.index[token]
+
         if document_id in self.document_lengths:
             del self.document_lengths[document_id]
-            self.total_documents -= 1
 
-        for term in list(self.index.keys()):
-            if document_id in self.index[term]:
-                del self.index[term][document_id]
-                self.document_frequency[term] -= 1
+        self.total_documents -= 1
 
-                if not self.index[term]:
-                    del self.index[term]
-                    del self.document_frequency[term]
+    def search(
+        self,
+        query: str,
+    ):
 
-    def search(self, query: str):
         tokens = preprocess(query)
 
         if not tokens:
@@ -62,10 +84,11 @@ class InvertedIndex:
         results = None
 
         for token in tokens:
+
             docs = set(self.index.get(token, {}).keys())
 
             if results is None:
-                results = docs.copy()
+                results = docs
             else:
                 results &= docs
 
