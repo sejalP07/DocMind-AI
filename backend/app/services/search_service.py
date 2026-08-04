@@ -4,6 +4,7 @@ from app.repositories.document_repository import DocumentRepository
 from app.search.bm25 import BM25
 from app.search.inverted_index import InvertedIndex
 from app.search.preprocess import preprocess
+from app.search.phrase_search import PhraseSearch
 
 
 class SearchService:
@@ -36,6 +37,28 @@ class SearchService:
         query: str,
     ):
 
+        # Build index if needed
+        if not self.index_built:
+            await self.build_index(db)
+
+        # Get all documents
+        documents = await DocumentRepository.get_all_documents(db)
+
+        # -----------------------------
+        # Phrase Search
+        # -----------------------------
+        if query.startswith('"') and query.endswith('"'):
+
+            phrase = query[1:-1]
+
+            return PhraseSearch.search(
+                documents,
+                phrase,
+            )
+
+        # -----------------------------
+        # BM25 Search
+        # -----------------------------
         query_tokens = preprocess(query)
 
         if self.index.total_documents == 0:
