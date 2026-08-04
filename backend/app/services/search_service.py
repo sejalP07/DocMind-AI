@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.document_repository import DocumentRepository
+from app.search.bm25 import BM25
 from app.search.inverted_index import InvertedIndex
 from app.search.preprocess import preprocess
-from app.search.tfidf import TFIDF
 
 
 class SearchService:
@@ -16,9 +16,6 @@ class SearchService:
         self,
         db: AsyncSession,
     ):
-        """
-        Build the in-memory inverted index once.
-        """
 
         if self.index_built:
             return
@@ -38,25 +35,46 @@ class SearchService:
         db: AsyncSession,
         query: str,
     ):
-        """
-        Search documents using TF-IDF ranking.
-        """
 
         query_tokens = preprocess(query)
 
-        ranked = TFIDF.rank_documents(
-            query_tokens=query_tokens,
-            index=self.index.index,
-            total_documents=self.index.total_documents,
-            document_frequency=self.index.document_frequency,
+        if self.index.total_documents == 0:
+            return []
+
+        average_document_length = (
+            sum(self.index.document_lengths.values())
+            / self.index.total_documents
         )
 
-        document_ids = [
-            document_id
-            for document_id, _ in ranked
-        ]
+        scores = {}
+
+        for term in query_tokens:
+
+            if term not in self.index.index:
+                continue
+
+            for document_id, term_frequency in self.index.index[term].items():
+
+                score = BM25.score(
+                    term_frequency=term_frequency,
+                    document_frequency=self.index.document_frequency[term],
+                    total_documents=self.index.total_documents,
+                    document_length=self.index.document_lengths[document_id],
+                    average_document_length=average_document_length,
+                )
+
+                scores[document_id] = (
+                    scores.get(document_id, 0)
+                    + score
+                )
+
+        ranked_ids = sorted(
+            scores.keys(),
+            key=lambda doc_id: scores[doc_id],
+            reverse=True,
+        )
 
         return await DocumentRepository.get_documents_by_ids(
             db,
-            document_ids,
+            ranked_ids,
         )
