@@ -9,6 +9,7 @@ from app.schemas.document import (
 from app.schemas.search import SearchResult
 from app.services.document_service import DocumentService
 
+
 router = APIRouter(tags=["Documents"])
 
 
@@ -85,6 +86,15 @@ async def autocomplete(
     db: AsyncSession = Depends(get_db),
 ):
     return await DocumentService.autocomplete(
+        db,
+        q,
+    )
+@router.get("/distributed-search")
+async def distributed_search(
+    q: str,
+    db: AsyncSession = Depends(get_db),
+):
+    return await DocumentService.distributed_search(
         db,
         q,
     )

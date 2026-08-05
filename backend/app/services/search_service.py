@@ -11,12 +11,15 @@ from app.search.boolean_search import BooleanSearch
 from app.search.fuzzy_search import FuzzySearch
 from app.search.autocomplete import Autocomplete
 from app.core.redis import redis_client
+from app.search.coordinator import SearchCoordinator
+
 
 
 class SearchService:
 
     def __init__(self):
         self.index = InvertedIndex()
+        self.coordinator = SearchCoordinator(shard_count=3)
         self.index_built = False
 
     async def build_index(
@@ -31,6 +34,10 @@ class SearchService:
 
         for document in documents:
             self.index.add_document(
+                document.id,
+                document.content,
+            )
+            self.coordinator.add_document(
                 document.id,
                 document.content,
             )
@@ -173,4 +180,21 @@ class SearchService:
         return Autocomplete.suggest(
             self.index,
             prefix,
+        )
+    async def distributed_search(
+        self,
+        db: AsyncSession,
+        query: str,
+    ):
+
+        if not self.index_built:
+            await self.build_index(db)
+
+        document_ids = list(
+            self.coordinator.search(query)
+        )
+
+        return await DocumentRepository.get_documents_by_ids(
+            db,
+            document_ids,
         )

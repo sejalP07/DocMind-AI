@@ -82,6 +82,18 @@ class DocumentService:
         )
 
     @staticmethod
+    async def distributed_search(
+        db: AsyncSession,
+        query: str,
+    ):
+        await search_service.build_index(db)
+
+        return await search_service.distributed_search(
+            db,
+            query,
+        )
+
+    @staticmethod
     async def search_documents(
         db: AsyncSession,
         query: str,
