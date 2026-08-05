@@ -1,4 +1,3 @@
-from sys import prefix
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +18,7 @@ class SearchService:
 
     def __init__(self):
         self.index = InvertedIndex()
-        self.coordinator = SearchCoordinator(shard_count=3)
+        self.coordinator = SearchCoordinator()
         self.index_built = False
 
     async def build_index(
@@ -37,10 +36,7 @@ class SearchService:
                 document.id,
                 document.content,
             )
-            self.coordinator.add_document(
-                document.id,
-                document.content,
-            )
+            
 
         self.index_built = True
 
@@ -181,20 +177,10 @@ class SearchService:
             self.index,
             prefix,
         )
+
     async def distributed_search(
         self,
         db: AsyncSession,
         query: str,
     ):
-
-        if not self.index_built:
-            await self.build_index(db)
-
-        document_ids = list(
-    await self.coordinator.search(query)
-)
-
-        return await DocumentRepository.get_documents_by_ids(
-            db,
-            document_ids,
-        )
+        return await self.coordinator.search(query)

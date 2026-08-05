@@ -1,54 +1,44 @@
 import asyncio
-
-from app.search.shard import SearchShard
+import httpx
 
 
 class SearchCoordinator:
 
-    def __init__(self, shard_count: int = 3):
+    def __init__(self):
         self.shards = [
-            SearchShard(i)
-            for i in range(shard_count)
+            "http://127.0.0.1:8001",
+            "http://127.0.0.1:8002",
+            "http://127.0.0.1:8003",
         ]
-
-    def get_shard(
-        self,
-        document_id: int,
-    ):
-        return self.shards[
-            document_id % len(self.shards)
-        ]
-
-    def add_document(
-        self,
-        document_id: int,
-        content: str,
-    ):
-        shard = self.get_shard(document_id)
-
-        shard.add_document(
-            document_id,
-            content,
-        )
 
     async def search(
         self,
         query: str,
     ):
+        async with httpx.AsyncClient(timeout=10.0) as client:
 
-        tasks = [
-            asyncio.to_thread(
-                shard.search,
-                query,
+            tasks = [
+                client.get(
+                    f"{shard}/search",
+                    params={"q": query},
+                )
+                for shard in self.shards
+            ]
+
+            responses = await asyncio.gather(
+                *tasks,
+                return_exceptions=True,
             )
-            for shard in self.shards
-        ]
 
-        shard_results = await asyncio.gather(*tasks)
+        results = []
 
-        results = set()
+        for response in responses:
 
-        for docs in shard_results:
-            results |= docs
+            if isinstance(response, Exception):
+                print("Shard unavailable:", response)
+                continue
+
+            if response.status_code == 200:
+                results.extend(response.json())
 
         return results
