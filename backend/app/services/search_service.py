@@ -10,6 +10,7 @@ from app.search.phrase_search import PhraseSearch
 from app.search.boolean_search import BooleanSearch
 from app.search.fuzzy_search import FuzzySearch
 from app.search.autocomplete import Autocomplete
+from app.core.redis import redis_client
 
 
 class SearchService:
@@ -53,6 +54,24 @@ class SearchService:
             self.index,
             query,
         )
+
+        # -----------------------------
+        # Redis Cache
+        # -----------------------------
+        import json
+        cache_key = f"search:{query}"
+
+        cached = redis_client.get(cache_key)
+
+        if cached:
+            print("Cache Hit")
+
+            ids = json.loads(cached)
+
+            return await DocumentRepository.get_documents_by_ids(
+                db,
+                ids,
+            )
         # -----------------------------
         # Phrase Search
         # -----------------------------
@@ -127,10 +146,20 @@ class SearchService:
             reverse=True,
         )
 
-        return await DocumentRepository.get_documents_by_ids(
+        documents = await DocumentRepository.get_documents_by_ids(
             db,
             ranked_ids,
         )
+
+        redis_client.set(
+            cache_key,
+            json.dumps(ranked_ids),
+            ex=300,  # Cache for 5 minutes
+        )
+
+        print("Cache Saved")
+
+        return documents
 
     async def autocomplete(
         self,
