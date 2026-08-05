@@ -70,6 +70,18 @@ class DocumentService:
         }
 
     @staticmethod
+    async def autocomplete(
+        db: AsyncSession,
+        prefix: str,
+    ):
+        await search_service.build_index(db)
+
+        return await search_service.autocomplete(
+            db,
+            prefix,
+        )
+
+    @staticmethod
     async def search_documents(
         db: AsyncSession,
         query: str,

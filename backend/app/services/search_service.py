@@ -1,3 +1,5 @@
+from sys import prefix
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.document_repository import DocumentRepository
@@ -7,7 +9,7 @@ from app.search.preprocess import preprocess
 from app.search.phrase_search import PhraseSearch
 from app.search.boolean_search import BooleanSearch
 from app.search.fuzzy_search import FuzzySearch
-
+from app.search.autocomplete import Autocomplete
 
 
 class SearchService:
@@ -128,4 +130,18 @@ class SearchService:
         return await DocumentRepository.get_documents_by_ids(
             db,
             ranked_ids,
+        )
+
+    async def autocomplete(
+        self,
+        db: AsyncSession,
+        prefix: str,
+    ):
+
+        if not self.index_built:
+            await self.build_index(db)
+
+        return Autocomplete.suggest(
+            self.index,
+            prefix,
         )

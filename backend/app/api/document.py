@@ -79,3 +79,12 @@ async def search_documents(
         page,
         size,
     )
+@router.get("/autocomplete")
+async def autocomplete(
+    q: str,
+    db: AsyncSession = Depends(get_db),
+):
+    return await DocumentService.autocomplete(
+        db,
+        q,
+    )
