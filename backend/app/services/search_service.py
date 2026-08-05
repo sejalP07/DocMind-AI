@@ -191,8 +191,8 @@ class SearchService:
             await self.build_index(db)
 
         document_ids = list(
-            self.coordinator.search(query)
-        )
+    await self.coordinator.search(query)
+)
 
         return await DocumentRepository.get_documents_by_ids(
             db,
