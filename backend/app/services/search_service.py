@@ -6,6 +6,9 @@ from app.search.inverted_index import InvertedIndex
 from app.search.preprocess import preprocess
 from app.search.phrase_search import PhraseSearch
 from app.search.boolean_search import BooleanSearch
+from app.search.fuzzy_search import FuzzySearch
+
+
 
 class SearchService:
 
@@ -40,6 +43,14 @@ class SearchService:
         if not self.index_built:
             await self.build_index(db)
 
+
+        # -----------------------------
+        # Fuzzy Search
+        # -----------------------------
+        query = FuzzySearch.correct_query(
+            self.index,
+            query,
+        )
         # -----------------------------
         # Phrase Search
         # -----------------------------
