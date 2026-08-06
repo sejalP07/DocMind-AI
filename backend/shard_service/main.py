@@ -1,35 +1,60 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from shard_common.database import get_db
+from shard_common.repository import DocumentRepository
+from shard_common.shard_loader import ShardLoader
 
-app = FastAPI(title="Shard 1")
+loader = ShardLoader(
+    shard_id=1,
+    total_shards=3,
+)
 
-DOCUMENTS = [
-    {
-        "id": 1,
-        "title": "Python FastAPI Guide",
-        "content": "Python Python FastAPI REST API tutorial",
-        "url": "https://doc1.com",
-    },
-    {
-        "id": 2,
-        "title": "Advanced Python",
-        "content": "Python programming language advanced concepts",
-        "url": "https://doc2.com",
-    },
-]
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async for db in get_db():
+        await loader.load(
+            db,
+            DocumentRepository,
+        )
+        break
+
+    print(f"Shard 1 loaded {len(loader.documents)} documents")
+
+    yield
+
+
+app = FastAPI(
+    title="Shard 1",
+    lifespan=lifespan,
+)
 
 
 @app.get("/health")
 def health():
-    return {"status": "Shard 1 Running"}
+    return {
+        "status": "healthy",
+        "shard": 1,
+        "documents": len(loader.documents),
+    }
 
 
 @app.get("/search")
-def search(q: str):
-    q = q.lower()
+async def search(q: str):
+    return loader.search(q)
 
-    return [
-        doc
-        for doc in DOCUMENTS
-        if q in doc["title"].lower()
-        or q in doc["content"].lower()
-    ]
+
+@app.post("/reload")
+async def reload():
+    async for db in get_db():
+        await loader.load(
+            db,
+            DocumentRepository,
+        )
+        break
+
+    return {
+        "message": "Shard reloaded",
+        "documents": len(loader.documents),
+    }

@@ -4,21 +4,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.document_repository import DocumentRepository
 from app.schemas.document import DocumentCreate
 from app.services.search_service import SearchService
+from app.search.shard_client import ShardClient
+
+
+
 
 search_service = SearchService()
 
 
 class DocumentService:
-
     @staticmethod
     async def create_document(
         db: AsyncSession,
         document: DocumentCreate,
     ):
-        return await DocumentRepository.create(
+        document = await DocumentRepository.create(
             db,
             document,
         )
+
+        await ShardClient.reload_all()
+
+        return document
 
     @staticmethod
     async def get_documents(
