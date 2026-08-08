@@ -1,46 +1,41 @@
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.models.document import Document
-from app.schemas.document import DocumentCreate
 
 
 class DocumentRepository:
 
     @staticmethod
-    async def create(
-        db: AsyncSession,
-        document: DocumentCreate,
-    ) -> Document:
-
+    async def create(db, document):
         db_document = Document(
             title=document.title,
             content=document.content,
             url=document.url,
         )
 
-        db.add(db_document)
+        try:
+            db.add(db_document)
 
-        await db.commit()
-        await db.refresh(db_document)
+            await db.commit()
+            await db.refresh(db_document)
 
-        return db_document
+            return db_document
+
+        except IntegrityError:
+            await db.rollback()
+            raise
 
     @staticmethod
     async def get_all(
         db: AsyncSession,
     ):
         result = await db.execute(
-            select(Document)
+            select(Document).order_by(Document.id)
         )
 
         return result.scalars().all()
-
-    @staticmethod
-    async def get_all_documents(
-        db: AsyncSession,
-    ):
-        return await DocumentRepository.get_all(db)
 
     @staticmethod
     async def get_documents_by_ids(
@@ -82,7 +77,6 @@ class DocumentRepository:
         db: AsyncSession,
         document_id: int,
     ):
-
         result = await db.execute(
             select(Document).where(
                 Document.id == document_id
@@ -96,7 +90,6 @@ class DocumentRepository:
         db: AsyncSession,
         document: Document,
     ):
-
         await db.delete(document)
         await db.commit()
 
@@ -107,7 +100,6 @@ class DocumentRepository:
         page: int = 1,
         size: int = 10,
     ):
-
         result = await db.execute(
             select(Document).where(
                 or_(
@@ -152,3 +144,4 @@ class DocumentRepository:
         end = start + size
 
         return results[start:end]
+    

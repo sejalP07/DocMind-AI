@@ -1,31 +1,33 @@
-import asyncio
 import httpx
+
+from app.search.shard_router import ShardRouter
 
 
 class ShardClient:
 
-    SHARDS = [
-        "http://127.0.0.1:8001",
-        "http://127.0.0.1:8002",
-        "http://127.0.0.1:8003",
-    ]
-
     @staticmethod
-    async def reload_all():
-        async with httpx.AsyncClient(timeout=10.0) as client:
+    async def index_document(document):
 
-            tasks = [
-                client.post(f"{shard}/reload")
-                for shard in ShardClient.SHARDS
-            ]
+        shard_url = ShardRouter.get_shard(
+            document.id
+        )
 
-            results = await asyncio.gather(
-                *tasks,
-                return_exceptions=True,
+        payload = {
+            "id": document.id,
+            "title": document.title,
+            "content": document.content,
+            "url": document.url,
+        }
+
+        async with httpx.AsyncClient(
+            timeout=10.0
+        ) as client:
+
+            response = await client.post(
+                f"{shard_url}/index",
+                json=payload,
             )
 
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    print(f"Shard {i + 1} reload failed: {result}")
-                else:
-                    print(f"Shard {i + 1} reloaded successfully")
+            response.raise_for_status()
+
+            return response.json()

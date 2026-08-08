@@ -25,18 +25,15 @@ class SearchService:
         self,
         db: AsyncSession,
     ):
-
         if self.index_built:
             return
 
-        documents = await DocumentRepository.get_all_documents(db)
-
+        documents = await DocumentRepository.get_all(db)
         for document in documents:
             self.index.add_document(
                 document.id,
                 document.content,
             )
-            
 
         self.index_built = True
 
@@ -80,7 +77,7 @@ class SearchService:
         # -----------------------------
         if query.startswith('"') and query.endswith('"'):
 
-            documents = await DocumentRepository.get_all_documents(db)
+            documents = await DocumentRepository.get_all(db)
 
             return PhraseSearch.search(
                 documents,

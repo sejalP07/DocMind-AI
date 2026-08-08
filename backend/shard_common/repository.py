@@ -7,9 +7,8 @@ class DocumentRepository:
 
     @staticmethod
     async def get_all(db):
-
         result = await db.execute(
-            select(Document)
+            select(Document).order_by(Document.id)
         )
 
         return result.scalars().all()

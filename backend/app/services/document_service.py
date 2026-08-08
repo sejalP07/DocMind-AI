@@ -5,7 +5,8 @@ from app.repositories.document_repository import DocumentRepository
 from app.schemas.document import DocumentCreate
 from app.services.search_service import SearchService
 from app.search.shard_client import ShardClient
-
+from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException
 
 
 
@@ -14,19 +15,27 @@ search_service = SearchService()
 
 class DocumentService:
     @staticmethod
-    async def create_document(
-        db: AsyncSession,
-        document: DocumentCreate,
-    ):
-        document = await DocumentRepository.create(
-            db,
-            document,
-        )
+    async def create_document(db, document):
+        try:
+            # 1. Save document to PostgreSQL
+            saved_document = await DocumentRepository.create(
+                db,
+                document
+            )
 
-        await ShardClient.reload_all()
+            # 2. Send document to the correct shard
+            await ShardClient.index_document(
+                saved_document
+            )
 
-        return document
+            # 3. Return saved document
+            return saved_document
 
+        except IntegrityError:
+            raise HTTPException(
+                status_code=409,
+                detail="A document with this URL already exists"
+            )
     @staticmethod
     async def get_documents(
         db: AsyncSession,
