@@ -1,6 +1,8 @@
 import asyncio
 import httpx
 import json
+from app.core.redis import redis_client
+
 
 class SearchCoordinator:
 
@@ -134,6 +136,18 @@ class SearchCoordinator:
         }
 
     async def search(self, query: str):
+        query = query.strip().lower()
+
+        cache_key = f"distributed-search:{query}"
+
+        cached = redis_client.get(cache_key)
+
+        if cached:
+            print("Distributed Search Cache HIT")
+            return json.loads(cached)
+
+        print("Distributed Search Cache MISS")
+        
         healthy_shards = await self.get_healthy_shards()    
         failed_shards = [
             shard_id
@@ -177,13 +191,22 @@ class SearchCoordinator:
         # Global ranking
         results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
-        return {
+        response = {
             "query": query,
             "total": len(results),
             "partial": len(failed_shards) > 0,
             "failed_shards": failed_shards,
             "results": results,
         }
+        redis_client.set(
+            cache_key,
+            json.dumps(response),
+            ex=300,
+        )
+
+        print("Distributed Search Cache SAVED")
+
+        return response
     
     async def get_global_stats(self):
 
