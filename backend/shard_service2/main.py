@@ -48,13 +48,23 @@ def health():
         "shard": 2,
         "documents": len(loader.documents),
     }
-
-
 @app.get("/search")
-async def search(q: str):
+async def search(
+    q: str,
+    total_documents: int = 0,
+    average_document_length: float = 0,
+    document_frequency: str = "",
+):
+    return loader.search(
+        q,
+        total_documents=total_documents,
+        average_document_length=average_document_length,
+        document_frequency=document_frequency,
+    )
 
-    return loader.search(q)
-
+@app.get("/stats")
+async def stats():
+    return loader.get_stats()
 
 @app.post("/index")
 async def index_document(
