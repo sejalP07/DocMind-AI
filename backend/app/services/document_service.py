@@ -27,6 +27,7 @@ class DocumentService:
             await ShardClient.index_document(
                 saved_document
             )
+            search_service.invalidate_distributed_cache()
 
             # 3. Return saved document
             return saved_document
@@ -80,6 +81,7 @@ class DocumentService:
             db,
             document,
         )
+        search_service.invalidate_distributed_cache()
 
         return {
             "message": "Document deleted successfully"

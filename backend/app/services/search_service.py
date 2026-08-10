@@ -181,3 +181,5 @@ class SearchService:
         query: str,
     ):
         return await self.coordinator.search(query)
+    def invalidate_distributed_cache(self):
+        self.coordinator.invalidate_cache()

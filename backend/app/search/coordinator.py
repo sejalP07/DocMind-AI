@@ -208,6 +208,23 @@ class SearchCoordinator:
 
         return response
     
+    
+    def invalidate_cache(self):
+        try:
+            keys = redis_client.keys(
+                "distributed-search:*"
+            )
+
+            if keys:
+                redis_client.delete(*keys)
+
+            print(
+                f"Invalidated {len(keys)} distributed search cache entries"
+            )
+
+        except Exception as exc:
+            print(f"Cache invalidation failed: {exc}")
+        
     async def get_global_stats(self):
 
         async with httpx.AsyncClient() as client:
