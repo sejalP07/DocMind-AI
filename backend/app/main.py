@@ -13,3 +13,9 @@ def root():
     return {
         "message": "Distributed Search Engine API"
     }
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "service": "distributed-search-engine"
+    }
