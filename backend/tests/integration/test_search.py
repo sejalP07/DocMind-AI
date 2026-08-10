@@ -21,3 +21,13 @@ def test_distributed_search():
         assert "title" in result
         assert "score" in result
         assert "shard" in result
+    assert "shard_latency_ms" in data
+
+    assert isinstance(
+    data["shard_latency_ms"],
+    dict,
+    )
+
+    for shard_id in ["1", "2", "3"]:
+        assert shard_id in data["shard_latency_ms"]
+        assert data["shard_latency_ms"][shard_id] >= 0

@@ -2,7 +2,7 @@ import asyncio
 import httpx
 import json
 from app.core.redis import redis_client
-
+import time
 
 class SearchCoordinator:
 
@@ -34,6 +34,7 @@ class SearchCoordinator:
             )
 
             return None
+
     async def search_shard(
         self,
         client: httpx.AsyncClient,
@@ -42,7 +43,6 @@ class SearchCoordinator:
         query: str,
         global_stats: dict,
     ):
-
         params = {
             "q": query,
             "total_documents": global_stats["total_documents"],
@@ -53,6 +53,8 @@ class SearchCoordinator:
                 global_stats["document_frequency"]
             ),
         }
+
+        start_time = time.perf_counter()
 
         for attempt in range(2):
 
@@ -65,9 +67,14 @@ class SearchCoordinator:
 
                 response.raise_for_status()
 
+                latency_ms = (
+                    time.perf_counter() - start_time
+                ) * 1000
+
                 return {
                     "shard": shard_id,
                     "status": "success",
+                    "latency_ms": round(latency_ms, 2),
                     "results": response.json(),
                 }
 
@@ -79,41 +86,50 @@ class SearchCoordinator:
                 )
 
                 if attempt == 1:
+                    latency_ms = (
+                        time.perf_counter() - start_time
+                    ) * 1000
+
                     return {
                         "shard": shard_id,
                         "status": "failed",
+                        "latency_ms": round(
+                            latency_ms,
+                            2,
+                        ),
                         "results": [],
                     }
 
                 await asyncio.sleep(0.2)
+
     async def check_shard_health(
-            self,
-            client: httpx.AsyncClient,
-            shard_id: int,
-            url: str,
-        ):
-            try:
-                response = await client.get(
-                    f"{url}/health",
-                    timeout=1.0,
-                )
+        self,
+        client: httpx.AsyncClient,
+        shard_id: int,
+        url: str,
+    ):
+        try:
+            response = await client.get(
+                f"{url}/health",
+                timeout=1.0,
+            )
 
-                response.raise_for_status()
+            response.raise_for_status()
 
-                return {
-                    "shard": shard_id,
-                    "healthy": True,
-                }
+            return {
+                "shard": shard_id,
+                "healthy": True,
+            }
 
-            except Exception as exc:
-                print(
-                    f"Shard {shard_id} unhealthy: {exc}"
-                )
+        except Exception as exc:
+            print(
+                f"Shard {shard_id} unhealthy: {exc}"
+            )
 
-                return {
-                    "shard": shard_id,
-                    "healthy": False,
-                }
+            return {
+                "shard": shard_id,
+                "healthy": False,
+            }
 
     async def get_healthy_shards(self):
 
@@ -176,9 +192,14 @@ class SearchCoordinator:
             shard_results = await asyncio.gather(*tasks)
 
         results = []
+        shard_latency = {}
         
 
         for shard_result in shard_results:
+            
+            shard_latency[
+                str(shard_result["shard"])
+            ] = shard_result["latency_ms"]
 
             if shard_result["status"] == "failed":
                 failed_shards.append(shard_result["shard"])
@@ -196,6 +217,7 @@ class SearchCoordinator:
             "total": len(results),
             "partial": len(failed_shards) > 0,
             "failed_shards": failed_shards,
+            "shard_latency_ms": shard_latency,
             "results": results,
         }
         redis_client.set(
