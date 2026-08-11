@@ -2,11 +2,11 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.document_repository import DocumentRepository
-from app.schemas.document import DocumentCreate
+
 from app.services.search_service import SearchService
 from app.search.shard_client import ShardClient
 from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
+
 
 
 
@@ -103,6 +103,8 @@ class DocumentService:
     async def distributed_search(
         db: AsyncSession,
         query: str,
+        page: int = 1,
+        page_size: int = 10,
     ):
         await search_service.build_index(db)
 

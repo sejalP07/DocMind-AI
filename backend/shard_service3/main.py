@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import json
 
 from fastapi import FastAPI
 
@@ -56,6 +57,7 @@ async def search(
     average_document_length: float = 0,
     document_frequency: str = "",
 ):
+    document_frequency = json.loads(document_frequency)
     return loader.search(
         q,
         total_documents=total_documents,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
@@ -69,9 +69,9 @@ async def delete_document(
     response_model=list[SearchResult],
 )
 async def search_documents(
-    q: str,
-    page: int = 1,
-    size: int = 10,
+    q: str = Query(..., min_length=1, max_length=200),
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     return await DocumentService.search_documents(
@@ -82,19 +82,24 @@ async def search_documents(
     )
 @router.get("/autocomplete")
 async def autocomplete(
-    q: str,
+    q: str = Query(..., min_length=1, max_length=100),
     db: AsyncSession = Depends(get_db),
 ):
     return await DocumentService.autocomplete(
         db,
         q,
     )
+
 @router.get("/distributed-search")
 async def distributed_search(
-    q: str,
+    q: str = Query(..., min_length=1, max_length=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     return await DocumentService.distributed_search(
-        db,
-        q,
-    )
+    db,
+    q,
+    page,
+    page_size,
+)

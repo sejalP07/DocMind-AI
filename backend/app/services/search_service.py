@@ -1,16 +1,15 @@
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.document_repository import DocumentRepository
-from app.search.bm25 import BM25
-from app.search.inverted_index import InvertedIndex
-from app.search.preprocess import preprocess
-from app.search.phrase_search import PhraseSearch
-from app.search.boolean_search import BooleanSearch
-from app.search.fuzzy_search import FuzzySearch
-from app.search.autocomplete import Autocomplete
 from app.core.redis import redis_client
+from app.repositories.document_repository import DocumentRepository
+from app.search.autocomplete import Autocomplete
+from app.search.bm25 import BM25
+from app.search.boolean_search import BooleanSearch
 from app.search.coordinator import SearchCoordinator
+from app.search.fuzzy_search import FuzzySearch
+from app.search.inverted_index import InvertedIndex
+from app.search.phrase_search import PhraseSearch
+from app.search.preprocess import preprocess
 
 
 
@@ -174,12 +173,18 @@ class SearchService:
             self.index,
             prefix,
         )
-
     async def distributed_search(
         self,
         db: AsyncSession,
         query: str,
+        page: int = 1,
+        page_size: int = 10,
     ):
-        return await self.coordinator.search(query)
+        return await self.coordinator.search(
+            query,
+            page,
+            page_size,
+        )
+
     def invalidate_distributed_cache(self):
         self.coordinator.invalidate_cache()

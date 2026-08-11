@@ -1,25 +1,18 @@
-import asyncio
+import pytest
 import asyncpg
 
 
-async def main():
+@pytest.mark.asyncio
+async def test_postgres_connection():
     conn = await asyncpg.connect(
-        host="127.0.0.1",
-        port=5434,
+        host="postgres",
+        port=5432,
         user="postgres",
         password="postgres",
         database="search_engine",
     )
 
-    print("Connected!")
-
-    rows = await conn.fetch(
-        "SELECT current_database();"
-    )
-
-    print(rows)
+    rows = await conn.fetch("SELECT current_database();")
+    assert rows[0]["current_database"] == "search_engine"
 
     await conn.close()
-
-
-asyncio.run(main())

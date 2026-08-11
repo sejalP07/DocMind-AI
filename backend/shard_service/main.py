@@ -6,7 +6,7 @@ from shard_common.database import get_db
 from shard_common.repository import DocumentRepository
 from shard_common.shard_loader import ShardLoader
 from shard_common.index_request import IndexRequest
-
+import json
 
 loader = ShardLoader(
     shard_id=1,
@@ -56,6 +56,7 @@ async def search(
     average_document_length: float = 0,
     document_frequency: str = "",
 ):
+    document_frequency = json.loads(document_frequency)
     return loader.search(
         q,
         total_documents=total_documents,

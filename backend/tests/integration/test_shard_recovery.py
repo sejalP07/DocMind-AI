@@ -1,8 +1,7 @@
 import httpx
 
-
 BASE_URL = "http://127.0.0.1:8000"
-SHARD_2_URL = "http://127.0.0.1:8002"
+SHARD_2_URL = "http://shard2:8002"
 
 
 def test_shard_recovery():
@@ -19,31 +18,30 @@ def test_shard_recovery():
     assert health_data["status"] == "healthy"
     assert health_data["shard"] == 2
 
-    # 2. Clear Redis so we don't receive an old cached response
-    # Run manually before this test if necessary:
-    #
-    # docker exec -it search-redis redis-cli FLUSHDB
-
-    # 3. Perform distributed search
+    # 2. Perform distributed search through API container
     response = httpx.get(
         f"{BASE_URL}/distributed-search",
-        params={"q": "Python"},
-        timeout=10.0,
+        params={
+            "q": "Python",
+            "page": 1,
+            "page_size": 10,
+        },
+        timeout=15.0,
     )
 
     assert response.status_code == 200
 
     data = response.json()
 
-    # 4. Search should no longer be partial
+    # 3. Search should no longer be partial
     assert data["partial"] is False
     assert data["failed_shards"] == []
 
-    # 5. Results should exist
+    # 4. Results should exist
     assert data["total"] >= 1
     assert isinstance(data["results"], list)
 
-    # 6. Verify recovered Shard 2 participates
+    # 5. Verify recovered Shard 2 participates
     shard_ids = {
         result["shard"]
         for result in data["results"]

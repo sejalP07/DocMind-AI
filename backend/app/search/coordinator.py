@@ -1,8 +1,13 @@
 import asyncio
-import httpx
 import json
-from app.core.redis import redis_client
+import logging
 import time
+
+import httpx
+
+from app.core.redis import redis_client
+
+logger = logging.getLogger(__name__)
 
 class SearchCoordinator:
 
@@ -23,7 +28,7 @@ class SearchCoordinator:
         try:
             response = await client.get(
                 f"{url}/stats",
-                timeout=3.0,
+                timeout=5.0,
             )
 
             response.raise_for_status()
@@ -31,8 +36,12 @@ class SearchCoordinator:
             return response.json()
 
         except Exception as exc:
-            print(
-                f"Stats failed for shard {shard_id}: {exc}"
+            logger.warning(
+                "shard_stats_failed",
+                extra={
+                    "shard_id": shard_id,
+                    "error": str(exc),
+                },
             )
 
             return None
@@ -64,7 +73,7 @@ class SearchCoordinator:
                 response = await client.get(
                     f"{url}/search",
                     params=params,
-                    timeout=3.0,
+                    timeout=5.0,
                 )
 
                 response.raise_for_status()
@@ -82,9 +91,13 @@ class SearchCoordinator:
 
             except Exception as exc:
 
-                print(
-                    f"Shard {shard_id} "
-                    f"attempt {attempt + 1} failed: {exc}"
+                logger.warning(
+                    "shard_search_failed",
+                    extra={
+                        "shard_id": shard_id,
+                        "attempt": attempt + 1,
+                        "error": str(exc),
+                    },
                 )
 
                 if attempt == 1:
@@ -113,10 +126,18 @@ class SearchCoordinator:
         try:
             response = await client.get(
                 f"{url}/health",
-                timeout=1.0,
+                timeout=5.0,
             )
 
             response.raise_for_status()
+
+            logger.info(
+                "shard_healthy",
+                extra={
+                    "shard_id": shard_id,
+                    "status_code": response.status_code,
+                },
+            )
 
             return {
                 "shard": shard_id,
@@ -124,8 +145,12 @@ class SearchCoordinator:
             }
 
         except Exception as exc:
-            print(
-                f"Shard {shard_id} unhealthy: {exc}"
+            logger.warning(
+                "shard_unhealthy",
+                extra={
+                    "shard_id": shard_id,
+                    "error": str(exc),
+                },
             )
 
             return {
@@ -153,11 +178,22 @@ class SearchCoordinator:
             if result["healthy"]
         }
 
-    async def search(self, query: str):
+    async def search(
+        self,
+        query: str,
+        page: int = 1,
+        page_size: int = 10,
+    ):
         search_start = time.perf_counter()
 
         query = query.strip().lower()
-        cache_key = f"distributed-search:{query}"
+        page = max(page, 1)
+        page_size = max(min(page_size, 100), 1)
+        cache_key = (
+            f"distributed-search:{query}"
+            f":page:{page}"
+            f":page_size:{page_size}"
+        )
 
         # -----------------------------
         # CACHE HIT
@@ -167,9 +203,12 @@ class SearchCoordinator:
         if cached:
             self.cache_hits += 1
 
-            print(
-                f"Distributed Search Cache HIT "
-                f"(hits={self.cache_hits})"
+            logger.info(
+                "distributed_search_cache_hit",
+                extra={
+                    "query": query,
+                    "cache_hits": self.cache_hits,
+                },
             )
 
             response = json.loads(cached)
@@ -187,9 +226,12 @@ class SearchCoordinator:
         # -----------------------------
         self.cache_misses += 1
 
-        print(
-            f"Distributed Search Cache MISS "
-            f"(misses={self.cache_misses})"
+        logger.info(
+            "distributed_search_cache_miss",
+            extra={
+                "query": query,
+                "cache_misses": self.cache_misses,
+            },
         )
 
         healthy_shards = await self.get_healthy_shards()
@@ -249,6 +291,18 @@ class SearchCoordinator:
             key=lambda x: x.get("score", 0),
             reverse=True,
         )
+        total_results = len(results)
+
+        total_pages = (
+            (total_results + page_size - 1) // page_size
+            if total_results
+            else 0
+        )
+
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        paginated_results = results[start:end]
 
         total_latency_ms = (
             time.perf_counter() - search_start
@@ -259,7 +313,10 @@ class SearchCoordinator:
         # -----------------------------
         cached_response = {
             "query": query,
-            "total": len(results),
+            "total": total_results,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
             "partial": len(failed_shards) > 0,
             "failed_shards": failed_shards,
             "shard_latency_ms": shard_latency,
@@ -267,20 +324,35 @@ class SearchCoordinator:
                 total_latency_ms,
                 2,
             ),
-            "results": results,
+            "results": paginated_results,
         }
 
         # -----------------------------
         # SAVE ONLY STABLE DATA
         # -----------------------------
-        redis_client.set(
-            cache_key,
-            json.dumps(cached_response),
-            ex=300,
-        )
+        if not failed_shards:
+            redis_client.set(
+                cache_key,
+                json.dumps(cached_response),
+                ex=300,
+            )
 
-        print("Distributed Search Cache SAVED")
-
+            logger.info(
+                "distributed_search_cache_saved",
+                extra={
+                    "query": query,
+                    "page": page,
+                    "page_size": page_size,
+                },
+            )
+        else:
+            logger.warning(
+                "distributed_search_cache_skipped",
+                extra={
+                    "query": query,
+                    "failed_shards": failed_shards,
+                },
+            )
         # -----------------------------
         # RETURN WITH DYNAMIC METRICS
         # -----------------------------
@@ -289,6 +361,21 @@ class SearchCoordinator:
         response["cache_hit"] = False
         response["cache_hits"] = self.cache_hits
         response["cache_misses"] = self.cache_misses
+
+        logger.info(
+            "distributed_search_completed",
+            extra={
+                "query": query,
+                "total_results": total_results,
+                "page": page,
+                "page_size": page_size,
+                "failed_shards": failed_shards,
+                "total_latency_ms": round(
+                    total_latency_ms,
+                    2,
+                ),
+            },
+        )
 
         return response
     
@@ -301,12 +388,20 @@ class SearchCoordinator:
             if keys:
                 redis_client.delete(*keys)
 
-            print(
-                f"Invalidated {len(keys)} distributed search cache entries"
+            logger.info(
+                "distributed_search_cache_invalidated",
+                extra={
+                    "invalidated_keys": len(keys),
+                },
             )
 
         except Exception as exc:
-            print(f"Cache invalidation failed: {exc}")
+            logger.warning(
+                "cache_invalidation_failed",
+                extra={
+                    "error": str(exc),
+                },
+            )
         
     async def get_global_stats(self):
 

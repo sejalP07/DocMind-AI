@@ -86,31 +86,40 @@ class ShardLoader:
         average_document_length: float = 0,
         document_frequency: dict = None,
     ):
-
         query_tokens = preprocess(query)
 
         if not query_tokens:
             return []
 
-        total_documents = average_document_length
-
-        if total_documents == 0:
+        if total_documents <= 0:
             return []
 
-        # Calculate average document length
+        if average_document_length <= 0:
+            return []
+
+        if document_frequency is None:
+            document_frequency = {}
+
+        # Calculate the average document length for this shard's
+        # normalization, while keeping the GLOBAL document count
+        # supplied by the coordinator.
         total_length = sum(
             len(preprocess(doc["content"]))
             for doc in self.documents
         )
 
-        average_document_length = (
-            total_length / total_documents
+        shard_average_document_length = (
+            total_length / len(self.documents)
+            if self.documents
+            else average_document_length
         )
+
+        if shard_average_document_length <= 0:
+            return []
 
         scores = {}
 
         for document in self.documents:
-
             document_tokens = preprocess(
                 document["content"]
             )
@@ -118,26 +127,24 @@ class ShardLoader:
             document_length = len(document_tokens)
 
             for term in query_tokens:
-
                 term_frequency = document_tokens.count(term)
 
                 if term_frequency == 0:
                     continue
 
-            # Document frequency inside this shard
-                document_frequency = sum(
-                    1
-                    for doc in self.documents
-                    if term in preprocess(doc["content"])
+                # Use GLOBAL document frequency supplied by coordinator.
+                term_document_frequency = document_frequency.get(
+                    term,
+                    0,
                 )
 
                 score = BM25.score(
                     term_frequency=term_frequency,
-                    document_frequency=document_frequency,
+                    document_frequency=term_document_frequency,
                     total_documents=total_documents,
                     document_length=document_length,
                     average_document_length=average_document_length,
-                        )
+                )
 
                 scores[document["id"]] = (
                     scores.get(document["id"], 0)
@@ -147,7 +154,6 @@ class ShardLoader:
         results = []
 
         for document in self.documents:
-
             if document["id"] not in scores:
                 continue
 
@@ -168,7 +174,6 @@ class ShardLoader:
         )
 
         return results
-
     def get_stats(self):
         total_documents = len(self.documents)
 
