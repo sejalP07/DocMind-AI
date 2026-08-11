@@ -1,24 +1,87 @@
-version: "3.9"
-
 services:
 
   postgres:
     image: postgres:16
-
-    container_name: search-postgres
-
-    restart: always
-
+    container_name: distributed-search-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: search_engine
-
     ports:
-      - "5432:5432"
-
+      - "5434:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - search_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d search_engine"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: distributed-search-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+    container_name: distributed-search-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  shard1:
+    build:
+      context: ./backend
+    container_name: distributed-search-shard1
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+    ports:
+      - "8001:8001"
+    command: uvicorn shard_service.main:app --host 0.0.0.0 --port 8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  shard2:
+    build:
+      context: ./backend
+    container_name: distributed-search-shard2
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+    ports:
+      - "8002:8002"
+    command: uvicorn shard_service2.main:app --host 0.0.0.0 --port 8002
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  shard3:
+    build:
+      context: ./backend
+    container_name: distributed-search-shard3
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+    ports:
+      - "8003:8003"
+    command: uvicorn shard_service3.main:app --host 0.0.0.0 --port 8003
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  search_postgres_data:

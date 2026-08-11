@@ -27,7 +27,15 @@ def test_document_creation_invalidates_cache():
     )
 
     assert second.status_code == 200
-    assert second.json() == first_data
+    second_data = second.json()
+
+    assert second_data["query"] == first_data["query"]
+    assert second_data["total"] == first_data["total"]
+    assert second_data["partial"] == first_data["partial"]
+    assert second_data["failed_shards"] == first_data["failed_shards"]
+    assert second_data["results"] == first_data["results"]
+
+    assert second_data["cache_hit"] is True
 
     # 3. Create a document containing the query
     document = {

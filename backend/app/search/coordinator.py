@@ -7,10 +7,12 @@ import time
 class SearchCoordinator:
 
     SHARDS = {
-        1: "http://127.0.0.1:8001",
-        2: "http://127.0.0.1:8002",
-        3: "http://127.0.0.1:8003",
+        1: "http://shard1:8001",
+        2: "http://shard2:8002",
+        3: "http://shard3:8003",
     }
+    cache_hits = 0
+    cache_misses = 0
 
     async def get_shard_stats(
         self,
@@ -153,31 +155,59 @@ class SearchCoordinator:
 
     async def search(self, query: str):
         search_start = time.perf_counter()
-        
-        query = query.strip().lower()
 
+        query = query.strip().lower()
         cache_key = f"distributed-search:{query}"
 
+        # -----------------------------
+        # CACHE HIT
+        # -----------------------------
         cached = redis_client.get(cache_key)
 
         if cached:
-            print("Distributed Search Cache HIT")
-            return json.loads(cached)
+            self.cache_hits += 1
 
-        print("Distributed Search Cache MISS")
-        
-        healthy_shards = await self.get_healthy_shards()    
+            print(
+                f"Distributed Search Cache HIT "
+                f"(hits={self.cache_hits})"
+            )
+
+            response = json.loads(cached)
+
+            # Dynamic metrics are added AFTER
+            # reading the cached search result.
+            response["cache_hit"] = True
+            response["cache_hits"] = self.cache_hits
+            response["cache_misses"] = self.cache_misses
+
+            return response
+
+        # -----------------------------
+        # CACHE MISS
+        # -----------------------------
+        self.cache_misses += 1
+
+        print(
+            f"Distributed Search Cache MISS "
+            f"(misses={self.cache_misses})"
+        )
+
+        healthy_shards = await self.get_healthy_shards()
+
         failed_shards = [
             shard_id
             for shard_id in self.SHARDS
             if shard_id not in healthy_shards
         ]
 
-        
-        
-        # Get global BM25 statistics
+        # -----------------------------
+        # GLOBAL BM25 STATISTICS
+        # -----------------------------
         global_stats = await self.get_global_stats()
 
+        # -----------------------------
+        # SEARCH HEALTHY SHARDS
+        # -----------------------------
         async with httpx.AsyncClient() as client:
 
             tasks = [
@@ -195,49 +225,72 @@ class SearchCoordinator:
 
         results = []
         shard_latency = {}
-        
 
         for shard_result in shard_results:
-            
+
             shard_latency[
                 str(shard_result["shard"])
             ] = shard_result["latency_ms"]
 
             if shard_result["status"] == "failed":
-                failed_shards.append(shard_result["shard"])
+                failed_shards.append(
+                    shard_result["shard"]
+                )
                 continue
 
             for result in shard_result["results"]:
                 result["shard"] = shard_result["shard"]
                 results.append(result)
 
-        # Global ranking
-        results.sort(key=lambda x: x.get("score", 0), reverse=True)
+        # -----------------------------
+        # GLOBAL RANKING
+        # -----------------------------
+        results.sort(
+            key=lambda x: x.get("score", 0),
+            reverse=True,
+        )
 
         total_latency_ms = (
             time.perf_counter() - search_start
         ) * 1000
 
-        response = {
+        # -----------------------------
+        # STABLE SEARCH RESPONSE
+        # -----------------------------
+        cached_response = {
             "query": query,
             "total": len(results),
             "partial": len(failed_shards) > 0,
             "failed_shards": failed_shards,
             "shard_latency_ms": shard_latency,
-            "total_latency_ms": round(total_latency_ms, 2),
+            "total_latency_ms": round(
+                total_latency_ms,
+                2,
+            ),
             "results": results,
         }
 
+        # -----------------------------
+        # SAVE ONLY STABLE DATA
+        # -----------------------------
         redis_client.set(
             cache_key,
-            json.dumps(response),
+            json.dumps(cached_response),
             ex=300,
         )
 
         print("Distributed Search Cache SAVED")
 
+        # -----------------------------
+        # RETURN WITH DYNAMIC METRICS
+        # -----------------------------
+        response = cached_response.copy()
+
+        response["cache_hit"] = False
+        response["cache_hits"] = self.cache_hits
+        response["cache_misses"] = self.cache_misses
+
         return response
-    
     
     def invalidate_cache(self):
         try:

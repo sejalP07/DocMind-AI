@@ -24,4 +24,14 @@ def test_search_cache():
 
     assert second.status_code == 200
 
-    assert first.json() == second.json()
+    first_data = first.json()
+    second_data = second.json()
+
+    assert first_data["query"] == second_data["query"]
+    assert first_data["total"] == second_data["total"]
+    assert first_data["partial"] == second_data["partial"]
+    assert first_data["failed_shards"] == second_data["failed_shards"]
+    assert first_data["results"] == second_data["results"]
+
+    assert first_data["cache_hit"] is False
+    assert second_data["cache_hit"] is True
