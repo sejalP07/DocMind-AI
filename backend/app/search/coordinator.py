@@ -152,6 +152,8 @@ class SearchCoordinator:
         }
 
     async def search(self, query: str):
+        search_start = time.perf_counter()
+        
         query = query.strip().lower()
 
         cache_key = f"distributed-search:{query}"
@@ -212,14 +214,20 @@ class SearchCoordinator:
         # Global ranking
         results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
+        total_latency_ms = (
+            time.perf_counter() - search_start
+        ) * 1000
+
         response = {
             "query": query,
             "total": len(results),
             "partial": len(failed_shards) > 0,
             "failed_shards": failed_shards,
             "shard_latency_ms": shard_latency,
+            "total_latency_ms": round(total_latency_ms, 2),
             "results": results,
         }
+
         redis_client.set(
             cache_key,
             json.dumps(response),
