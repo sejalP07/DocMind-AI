@@ -1,6 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import React, { FormEvent, useState } from "react";
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface SearchResult {
   id: number;
@@ -46,7 +49,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/distributed-search?q=${encodeURIComponent(
+        `${API_URL}/distributed-search?q=${encodeURIComponent(
           trimmedQuery
         )}`
       );
@@ -126,7 +129,9 @@ export default function Home() {
               <input
                 type="text"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setQuery(event.target.value)
+                }
                 placeholder="Search documents..."
                 className="w-full rounded-xl border border-slate-700 bg-slate-900 py-4 pl-11 pr-12 text-white outline-none transition placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
@@ -291,7 +296,7 @@ export default function Home() {
                   </p>
                 </div>
               ) : (
-                data.results.map((result, index) => (
+                data.results.map((result: SearchResult, index: number) => (
                   <article
                     key={result.id}
                     className="group rounded-2xl border border-slate-800 bg-slate-900/70 p-6 transition hover:border-blue-500/40 hover:bg-slate-900"
