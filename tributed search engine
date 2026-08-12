@@ -1,0 +1,42 @@
+ .gitignore                                       |   58 [32m+[m[31m-[m
+ README.md                                        |  984 [32m+++[m[31m-[m
+ backend/.dockerignore                            |    3 [32m+[m[31m-[m
+ backend/app/api/document.py                      |   23 [32m+[m[31m-[m
+ backend/app/main.py                              |   12 [32m+[m
+ backend/app/search/coordinator.py                |  159 [32m+[m[31m-[m
+ backend/app/services/document_service.py         |    6 [32m+[m[31m-[m
+ backend/app/services/search_service.py           |   25 [32m+[m[31m-[m
+ backend/requirements.txt                         |  Bin [31m1732[m -> [32m1778[m bytes
+ backend/shard_common/shard_loader.py             |   39 [32m+[m[31m-[m
+ backend/shard_service/main.py                    |    3 [32m+[m[31m-[m
+ backend/shard_service2/main.py                   |    2 [32m+[m
+ backend/shard_service3/main.py                   |    2 [32m+[m
+ backend/tests/integration/test_shard_recovery.py |   26 [32m+[m[31m-[m
+ backend/tests/test_connection.py                 |   23 [32m+[m[31m-[m
+ backend/tests/test_db.py                         |   13 [32m+[m[31m-[m
+ docker-compose.yml                               |   88 [32m+[m[31m-[m
+ docs/screenshots/01-swagger-api.png              |  Bin [31m0[m -> [32m71556[m bytes
+ docs/screenshots/02-distributed-search.png       |  Bin [31m0[m -> [32m162548[m bytes
+ docs/screenshots/03-docker-services.png          |  Bin [31m0[m -> [32m200145[m bytes
+ docs/screenshots/04-test-suite.png               |  Bin [31m0[m -> [32m215766[m bytes
+ docs/screenshots/05-metrics.png                  |  Bin [31m0[m -> [32m47323[m bytes
+ frontend/.gitignore                              |   45 [32m+[m
+ frontend/AGENTS.md                               |    9 [32m+[m
+ frontend/CLAUDE.md                               |    1 [32m+[m
+ frontend/README.md                               |   36 [32m+[m
+ frontend/app/favicon.ico                         |  Bin [31m0[m -> [32m25931[m bytes
+ frontend/app/globals.css                         |   26 [32m+[m
+ frontend/app/layout.tsx                          |   34 [32m+[m
+ frontend/app/page.tsx                            |  396 [32m++[m
+ frontend/eslint.config.mjs                       |   18 [32m+[m
+ frontend/next.config.ts                          |    7 [32m+[m
+ frontend/package-lock.json                       | 6781 [32m++++++++++++++++++++++[m
+ frontend/package.json                            |   26 [32m+[m
+ frontend/postcss.config.mjs                      |    7 [32m+[m
+ frontend/public/file.svg                         |    1 [32m+[m
+ frontend/public/globe.svg                        |    1 [32m+[m
+ frontend/public/next.svg                         |    1 [32m+[m
+ frontend/public/vercel.svg                       |    1 [32m+[m
+ frontend/public/window.svg                       |    1 [32m+[m
+ frontend/tsconfig.json                           |   34 [32m+[m
+ 41 files changed, 8659 insertions(+), 232 deletions(-)

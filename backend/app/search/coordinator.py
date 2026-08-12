@@ -1,20 +1,22 @@
 import asyncio
+import httpx
 import json
 import logging
+import os
 import time
 
-import httpx
-
 from app.core.redis import redis_client
+
+
 
 logger = logging.getLogger(__name__)
 
 class SearchCoordinator:
 
     SHARDS = {
-        1: "http://shard1:8001",
-        2: "http://shard2:8002",
-        3: "http://shard3:8003",
+        1: os.getenv("SHARD_1_URL", "http://shard1:8001"),
+        2: os.getenv("SHARD_2_URL", "http://shard2:8002"),
+        3: os.getenv("SHARD_3_URL", "http://shard3:8003"),
     }
     cache_hits = 0
     cache_misses = 0

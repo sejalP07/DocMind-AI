@@ -110,9 +110,13 @@ services:
       context: ./backend
     container_name: distributed-search-api
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+        DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+
+        SHARD_1_URL: http://shard1:8001
+        SHARD_2_URL: http://shard2:8002
+        SHARD_3_URL: http://shard3:8003
     ports:
       - "8005:8000"
     depends_on:
