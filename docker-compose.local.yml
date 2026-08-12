@@ -5,8 +5,10 @@ services:
     container_name: distributed-search-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: search_engine
+    ports:
+      - "5434:5432"
     volumes:
       - search_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,6 +21,8 @@ services:
   redis:
     image: redis:7
     container_name: distributed-search-redis
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -31,10 +35,10 @@ services:
       context: ./backend
     container_name: distributed-search-shard1
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+    ports:
+      - "8001:8001"
     command: uvicorn shard_service.main:app --host 0.0.0.0 --port 8001
-    expose:
-      - "8001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,10 +60,10 @@ services:
       context: ./backend
     container_name: distributed-search-shard2
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+    ports:
+      - "8002:8002"
     command: uvicorn shard_service2.main:app --host 0.0.0.0 --port 8002
-    expose:
-      - "8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,10 +85,10 @@ services:
       context: ./backend
     container_name: distributed-search-shard3
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+    ports:
+      - "8003:8003"
     command: uvicorn shard_service3.main:app --host 0.0.0.0 --port 8003
-    expose:
-      - "8003"
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,12 +110,13 @@ services:
       context: ./backend
     container_name: distributed-search-api
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      SHARD_1_URL: http://shard1:8001
-      SHARD_2_URL: http://shard2:8002
-      SHARD_3_URL: http://shard3:8003
+        DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/search_engine
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+
+        SHARD_1_URL: http://shard1:8001
+        SHARD_2_URL: http://shard2:8002
+        SHARD_3_URL: http://shard3:8003
     ports:
       - "8005:8000"
     depends_on:
